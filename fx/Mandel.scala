@@ -10,25 +10,77 @@ import scalafx.scene.text.Text
 import scalafx.stage.StageStyle
 import scalafx.animation.AnimationTimer
 import scala.util.control.Breaks._
+import scalafx.scene.input.MouseEvent
+
+import spire.syntax.cfor._
+
+object MandelbrotSet {
+
+  val WIDTH = 640
+  val HEIGHT = 480
+  val MAX_ITERATIONS = 200
+  val default: MandelbrotSet = MandelbrotSet(-0.5, 0, 1.5)
+
+}
+
+case class MandelbrotSet(
+  centerR: Double,
+  centerI: Double,
+  radius: Double
+) {
+
+  import MandelbrotSet.{WIDTH, HEIGHT, MAX_ITERATIONS}
+
+  val factor: Double = 2*radius/(WIDTH - 1)
+  val minR: Double = centerR - WIDTH*factor/2
+  val maxR: Double = centerR + WIDTH*factor/2
+  val minI: Double = centerI - HEIGHT*factor/2
+  val maxI: Double = centerI + HEIGHT*factor/2
+
+  def real(x: Int): Double = minR + x*factor
+  def imag(y: Int): Double = maxI - y*factor
+
+  private[this] def iterate(cR: Double, cI: Double): Int = {
+    var zR = cR
+    var zI = cI
+    var n = 0
+    while (n < MAX_ITERATIONS) {
+      val zR2 = zR * zR
+      val zI2 = zI * zI
+      if (zR2 + zI2 > 4.0) return n
+      zI = 2 * zR * zI + cI
+      zR = zR2 - zI2 + cR
+      n += 1
+    }
+    -1
+  }
+
+  def plot(writer: PixelWriter): Unit = {
+    cforRange(0 until HEIGHT) { y =>
+      val cI = maxI - y * factor
+      cforRange(0 until WIDTH) { x =>
+        val cR = minR + x * factor
+        val n = iterate(cR, cI)
+        val color = if (n == -1) 0xFF000010 else (n << 12) + 0xEF0000FF
+        writer.setArgb(x, y, color)
+      }
+    }
+  }
+
+  def zoomOnPixel(x: Int, y: Int): MandelbrotSet =
+    MandelbrotSet(real(x), imag(y), radius/2)
+
+}
 
 object Mandelbrot extends JFXApp {
 
-  val w = 640
-  val h = 480
-  val minR = -2.0
-  val maxR = 1.0
-  val minI = -1.1
-  val maxI = minI + (maxR - minR) * h / w
-  val factorR = (maxR - minR) / (w - 1)
-  val factorI = (maxI - minI) / (h - 1)
-  val iterations = 60
-  var phase = 12.0
+  import MandelbrotSet.{WIDTH, HEIGHT}
 
   stage = new PrimaryStage {
     title = "Mandelbrot"
     resizable = false
     initStyle(StageStyle.UTILITY)
-    scene = new Scene(w, h) {
+    scene = new Scene(WIDTH, HEIGHT) {
       fill = LinearGradient(
         startX = 0.0,
         startY = 0.0,
@@ -44,14 +96,17 @@ object Mandelbrot extends JFXApp {
         translateY = 20
         fill = Color.WHITE
       }
-      val canvas = new Canvas(w, h)
+      var mandel = MandelbrotSet.default
+      val canvas = new Canvas(WIDTH, HEIGHT)
       val gc = canvas.graphicsContext2D
       val group = new Group {
         focusTraversable = true
-        onKeyPressed = (ke: KeyEvent) => println(ke.code)
-        onKeyReleased = (ke: KeyEvent) => println(ke.code)
+        onMouseClicked = (e: MouseEvent) => {
+          mandel = mandel.zoomOnPixel(e.x.toInt, e.y.toInt)
+        }
         children = List(canvas, fpsLabel)
       }
+
       val writer = gc.getPixelWriter
       var lastTime = 0L
       var delta = 0D
@@ -61,13 +116,7 @@ object Mandelbrot extends JFXApp {
           delta = (ns - lastTime) / 1e9
           fps = s"${Math.round(1/delta)} fps"
           fpsLabel.text = fps
-          (0 until h).foreach { y =>
-            val cI = maxI - y * factorI
-            (0 until w).foreach { x =>
-              val cR = minR + x * factorR
-              plot(writer, x, y, cR -> cI)
-            }
-          }
+          mandel.plot(writer)
         }
         lastTime = ns
       } start()
@@ -75,21 +124,4 @@ object Mandelbrot extends JFXApp {
     }
   }
 
-  def plot(writer: PixelWriter, x: Int, y: Int, c: (Double, Double)) = {
-    val (cR, cI) = c
-    var ZR = cR
-    var ZI = cI
-    var isInside = true
-    var n = 0
-    breakable { while (n < iterations) {
-        val ZIsq = ZI * ZI
-        val ZRsq = ZR * ZR
-        if (ZRsq + ZIsq > 4) { isInside = false; break() }
-        ZI = 2 * ZR * ZI + cI
-        ZR = ZRsq - ZIsq + cR
-        n += 1
-    }}
-    val color = if (isInside) 0xFF000010 else (n << phase.toByte) + 0xEF0000FF
-    writer.setArgb(x, y, color)
-  }
 }

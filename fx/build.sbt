@@ -19,3 +19,5 @@ libraryDependencies ++= javaFXModules.map( m =>
   "org.openjfx" % s"javafx-$m" % "12.0.1" classifier osName
 )
 
+fork in run := true
+
