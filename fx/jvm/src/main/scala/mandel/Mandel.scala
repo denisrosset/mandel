@@ -13,32 +13,46 @@ import scala.util.control.Breaks._
 import scalafx.scene.input.MouseEvent
 
 import spire.syntax.cfor._
+import spire.math.Rational
 
 object MandelbrotSet {
 
   val WIDTH = 640
   val HEIGHT = 480
   val MAX_ITERATIONS = 200
-  val default: MandelbrotSet = MandelbrotSet(-0.5, 0, 1.5)
+  val default: MandelbrotSet = MandelbrotSetDouble(-Rational(1, 2), Rational.zero, Rational(3, 2))
 
 }
 
-case class MandelbrotSet(
-  centerR: Double,
-  centerI: Double,
-  radius: Double
-) {
+trait MandelbrotSet {
+  def centerR: Rational
+  def centerI: Rational
+  def radius: Rational
+  def plot(writer: PixelWriter): Unit
+  def zoomOnPixel(x: Int, y: Int): MandelbrotSet
+  def translate(x: Int, y: Int): MandelbrotSet
+  def updated(newCenterR: Rational, newCenterI: Rational, newRadius: Rational): MandelbrotSet
+}
+
+case class MandelbrotSetDouble(
+  centerR: Rational,
+  centerI: Rational,
+  radius: Rational
+) extends MandelbrotSet {
+
+  def updated(newCenterR: Rational, newCenterI: Rational, newRadius: Rational): MandelbrotSet = MandelbrotSetDouble(newCenterR, newCenterI, newRadius)
 
   import MandelbrotSet.{WIDTH, HEIGHT, MAX_ITERATIONS}
 
-  val factor: Double = 2*radius/(WIDTH - 1)
-  val minR: Double = centerR - WIDTH*factor/2
-  val maxR: Double = centerR + WIDTH*factor/2
-  val minI: Double = centerI - HEIGHT*factor/2
-  val maxI: Double = centerI + HEIGHT*factor/2
+  private[this] val factor: Rational = 2*radius/(WIDTH - 1)
+  private[this] val factorD: Double = factor.toDouble
+  private[this] val minR: Double = (centerR - WIDTH*factor/2).toDouble
+  private[this] val maxR: Double = (centerR + WIDTH*factor/2).toDouble
+  private[this] val minI: Double = (centerI - HEIGHT*factor/2).toDouble
+  private[this] val maxI: Double = (centerI + HEIGHT*factor/2).toDouble
 
-  def real(x: Int): Double = minR + x*factor
-  def imag(y: Int): Double = maxI - y*factor
+  private[this] def real(x: Int): Double = minR + x*factorD
+  private[this] def imag(y: Int): Double = maxI - y*factorD
 
   private[this] def iterate(cR: Double, cI: Double): Int = {
     var zR = cR
@@ -57,9 +71,9 @@ case class MandelbrotSet(
 
   def plot(writer: PixelWriter): Unit = {
     cforRange(0 until HEIGHT) { y =>
-      val cI = maxI - y * factor
+      val cI = maxI - y * factorD
       cforRange(0 until WIDTH) { x =>
-        val cR = minR + x * factor
+        val cR = minR + x * factorD
         val n = iterate(cR, cI)
         val color = if (n == -1) 0xFF000010 else (n << 12) + 0xEF0000FF
         writer.setArgb(x, y, color)
@@ -68,9 +82,9 @@ case class MandelbrotSet(
   }
 
   def zoomOnPixel(x: Int, y: Int): MandelbrotSet =
-    MandelbrotSet(real(x), imag(y), radius/2)
+    updated(real(x), imag(y), radius/2)
 
-  def translate(x: Int, y: Int): MandelbrotSet = MandelbrotSet(centerR - x * factor, centerI + y * factor, radius)
+  def translate(x: Int, y: Int): MandelbrotSet = updated(centerR - x * factor, centerI + y * factor, radius)
 
 }
 
