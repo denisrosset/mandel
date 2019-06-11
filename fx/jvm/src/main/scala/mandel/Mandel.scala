@@ -70,6 +70,8 @@ case class MandelbrotSet(
   def zoomOnPixel(x: Int, y: Int): MandelbrotSet =
     MandelbrotSet(real(x), imag(y), radius/2)
 
+  def translate(x: Int, y: Int): MandelbrotSet = MandelbrotSet(centerR - x * factor, centerI + y * factor, radius)
+
 }
 
 object Mandelbrot extends JFXApp {
@@ -100,9 +102,20 @@ object Mandelbrot extends JFXApp {
       val canvas = new Canvas(WIDTH, HEIGHT)
       val gc = canvas.graphicsContext2D
       val group = new Group {
+        var sx = 0
+        var sy = 0
+        var smandel = mandel
         focusTraversable = true
+        onMousePressed = (e: MouseEvent) => {
+          sx = e.x.toInt
+          sy = e.y.toInt
+          smandel = mandel
+        }
         onMouseClicked = (e: MouseEvent) => {
-          mandel = mandel.zoomOnPixel(e.x.toInt, e.y.toInt)
+          if (e.clickCount > 1) mandel = mandel.zoomOnPixel(e.x.toInt, e.y.toInt)
+        }
+        onMouseDragged = (e: MouseEvent) => {
+            mandel = smandel.translate(e.x.toInt - sx, e.y.toInt - sy)
         }
         children = List(canvas, fpsLabel)
       }
