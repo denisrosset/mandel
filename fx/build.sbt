@@ -1,5 +1,9 @@
 import sbtcrossproject.CrossPlugin.autoImport.{crossProject, CrossType}
 
+val scalaFXVersion = "12.0.1-R17"
+val scalaJSDomVersion = "0.9.7"
+val miniSpireVersion = "1.0.5-SNAPSHOT"
+
 // Determine OS version of JavaFX binaries
 lazy val osName = System.getProperty("os.name") match {
   case n if n.startsWith("Linux")   => "linux"
@@ -17,7 +21,7 @@ lazy val mandel = crossProject(JSPlatform, JVMPlatform, NativePlatform)
     resolvers ++= Seq(
       "bintray/denisrosset/maven" at "https://dl.bintray.com/denisrosset/maven"
     ),
-    libraryDependencies += "org.typelevel" %% "minispire" % "1.0.4"
+    libraryDependencies += "org.typelevel" %%% "minispire" % "1.0.5-SNAPSHOT"
   )
   .jvmSettings(
     scalaVersion := "2.12.8",
@@ -25,10 +29,12 @@ lazy val mandel = crossProject(JSPlatform, JVMPlatform, NativePlatform)
     libraryDependencies ++= javaFXModules.map( m =>
       "org.openjfx" % s"javafx-$m" % "12.0.1" classifier osName
     ),
-    libraryDependencies += "org.scalafx" %% "scalafx" % "12.0.1-R17",
+    libraryDependencies += "org.scalafx" %% "scalafx" % scalaFXVersion,
   )
   .jsSettings(
-    scalaVersion := "2.13.0-RC3"
+    scalaVersion := "2.12.8",
+    libraryDependencies += "org.scala-js" %%% "scalajs-dom" % scalaJSDomVersion,
+    scalaJSUseMainModuleInitializer := true
   )
   .nativeSettings(
     scalaVersion := "2.11.12"

@@ -14,6 +14,7 @@ import scalafx.scene.input.MouseEvent
 
 import spire.syntax.cfor._
 import spire.math.Rational
+import spire.algebra._
 
 object MandelbrotSet {
 
@@ -33,6 +34,63 @@ trait MandelbrotSet {
   def translate(x: Int, y: Int): MandelbrotSet
   def updated(newCenterR: Rational, newCenterI: Rational, newRadius: Rational): MandelbrotSet
 }
+
+case class MandelbrotSetGeneric[@specialized A:Field:Order](
+  centerR: Rational,
+  centerI: Rational,
+  radius: Rational
+) extends MandelbrotSet {
+
+  def updated(newCenterR: Rational, newCenterI: Rational, newRadius: Rational): MandelbrotSet = MandelbrotSetGeneric[A](newCenterR, newCenterI, newRadius)
+
+  def fromRational(r: Rational): A = Field.fromBigInt(r.numerator) / Field.fromBigInt(r.denominator)
+
+  import MandelbrotSet.{WIDTH, HEIGHT, MAX_ITERATIONS}
+
+  private[this] val factor: Rational = 2*radius/(WIDTH - 1)
+  private[this] val factorA: A = fromRational(factor)
+  private[this] val minR: A = fromRational(centerR - WIDTH*factor/2)
+  private[this] val maxR: A = fromRational(centerR + WIDTH*factor/2)
+  private[this] val minI: A = fromRational(centerI - HEIGHT*factor/2)
+  private[this] val maxI: A = fromRational(centerI + HEIGHT*factor/2)
+
+  private[this] def real(x: Int): A = minR + factorA*Field[A].fromInt(x)
+  private[this] def imag(y: Int): A = maxI - factorA*Field[A].fromInt(y)
+
+  private[this] def iterate(cR: A, cI: A): Int = {
+    var zR = cR
+    var zI = cI
+    var n = 0
+    while (n < MAX_ITERATIONS) {
+      val zR2 = zR * zR
+      val zI2 = zI * zI
+      if (zR2 + zI2 > 4.0) return n
+      zI = 2 * zR * zI + cI
+      zR = zR2 - zI2 + cR
+      n += 1
+    }
+    -1
+  }
+
+  def plot(writer: PixelWriter): Unit = {
+    cforRange(0 until HEIGHT) { y =>
+      val cI = maxI - y * factorD
+      cforRange(0 until WIDTH) { x =>
+        val cR = minR + x * factorD
+        val n = iterate(cR, cI)
+        val color = if (n == -1) 0xFF000010 else (n << 12) + 0xEF0000FF
+        writer.setArgb(x, y, color)
+      }
+    }
+  }
+
+  def zoomOnPixel(x: Int, y: Int): MandelbrotSet =
+    updated(real(x), imag(y), radius/2)
+
+  def translate(x: Int, y: Int): MandelbrotSet = updated(centerR - x * factor, centerI + y * factor, radius)
+ 
+}
+
 
 case class MandelbrotSetDouble(
   centerR: Rational,
