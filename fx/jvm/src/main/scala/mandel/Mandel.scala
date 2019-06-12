@@ -12,16 +12,18 @@ import scalafx.animation.AnimationTimer
 import scala.util.control.Breaks._
 import scalafx.scene.input.MouseEvent
 
-import spire.syntax.cfor._
-import spire.math.Rational
 import spire.algebra._
+import spire.math._
+import spire.implicits._
 
 object MandelbrotSet {
 
   val WIDTH = 640
   val HEIGHT = 480
   val MAX_ITERATIONS = 200
-  val default: MandelbrotSet = MandelbrotSetDouble(-Rational(1, 2), Rational.zero, Rational(3, 2))
+  val double: MandelbrotSet = MandelbrotSetDouble(-Rational(1, 2), Rational.zero, Rational(3, 2))
+  val genericDouble: MandelbrotSet = MandelbrotSetGeneric[Double](-Rational(1, 2), Rational.zero, Rational(3, 2))
+  val genericFloat: MandelbrotSet = MandelbrotSetGeneric[Float](-Rational(1, 2), Rational.zero, Rational(3, 2))
 
 }
 
@@ -35,7 +37,7 @@ trait MandelbrotSet {
   def updated(newCenterR: Rational, newCenterI: Rational, newRadius: Rational): MandelbrotSet
 }
 
-case class MandelbrotSetGeneric[@specialized A:Field:Order](
+case class MandelbrotSetGeneric[@specialized(Float, Double) A:Field:Order](
   centerR: Rational,
   centerI: Rational,
   radius: Rational
@@ -43,29 +45,33 @@ case class MandelbrotSetGeneric[@specialized A:Field:Order](
 
   def updated(newCenterR: Rational, newCenterI: Rational, newRadius: Rational): MandelbrotSet = MandelbrotSetGeneric[A](newCenterR, newCenterI, newRadius)
 
-  def fromRational(r: Rational): A = Field.fromBigInt(r.numerator) / Field.fromBigInt(r.denominator)
+  def fromRational(r: Rational): A = Field[A].fromBigInt(r.numerator.toBigInt) / Field[A].fromBigInt(r.denominator.toBigInt)
 
   import MandelbrotSet.{WIDTH, HEIGHT, MAX_ITERATIONS}
 
-  private[this] val factor: Rational = 2*radius/(WIDTH - 1)
-  private[this] val factorA: A = fromRational(factor)
-  private[this] val minR: A = fromRational(centerR - WIDTH*factor/2)
-  private[this] val maxR: A = fromRational(centerR + WIDTH*factor/2)
-  private[this] val minI: A = fromRational(centerI - HEIGHT*factor/2)
-  private[this] val maxI: A = fromRational(centerI + HEIGHT*factor/2)
+  val factor: Rational = 2*radius/(WIDTH - 1)
+  def factorA: A = fromRational(factor)
+  def minR: A = fromRational(centerR - WIDTH*factor/2)
+  def maxR: A = fromRational(centerR + WIDTH*factor/2)
+  def minI: A = fromRational(centerI - HEIGHT*factor/2)
+  def maxI: A = fromRational(centerI + HEIGHT*factor/2)
 
-  private[this] def real(x: Int): A = minR + factorA*Field[A].fromInt(x)
-  private[this] def imag(y: Int): A = maxI - factorA*Field[A].fromInt(y)
+  val four: A = Field[A].fromInt(4)
+  def realA(x: Int): A = minR + factorA*Field[A].fromInt(x)
+  def imagA(y: Int): A = maxI - factorA*Field[A].fromInt(y)
+  def real(x: Int): Rational = centerR - WIDTH*factor/2 + factor*x
+  def imag(y: Int): Rational = centerI + HEIGHT*factor/2 - factor*y
 
-  private[this] def iterate(cR: A, cI: A): Int = {
+  def iterate(cR: A, cI: A): Int = {
+    def twice(a: A): A = a + a
     var zR = cR
     var zI = cI
     var n = 0
     while (n < MAX_ITERATIONS) {
       val zR2 = zR * zR
       val zI2 = zI * zI
-      if (zR2 + zI2 > 4.0) return n
-      zI = 2 * zR * zI + cI
+      if (zR2 + zI2 > four) return n
+      zI = twice(zR * zI) + cI
       zR = zR2 - zI2 + cR
       n += 1
     }
@@ -73,14 +79,17 @@ case class MandelbrotSetGeneric[@specialized A:Field:Order](
   }
 
   def plot(writer: PixelWriter): Unit = {
+    val cacheMinR = minR
+    var cI = maxI
     cforRange(0 until HEIGHT) { y =>
-      val cI = maxI - y * factorD
+      var cR = cacheMinR
       cforRange(0 until WIDTH) { x =>
-        val cR = minR + x * factorD
         val n = iterate(cR, cI)
         val color = if (n == -1) 0xFF000010 else (n << 12) + 0xEF0000FF
         writer.setArgb(x, y, color)
+        cR += factorA
       }
+      cI -= factorA
     }
   }
 
@@ -170,7 +179,7 @@ object Mandelbrot extends JFXApp {
         translateY = 20
         fill = Color.WHITE
       }
-      var mandel = MandelbrotSet.default
+      var mandel = MandelbrotSet.genericDouble
       val canvas = new Canvas(WIDTH, HEIGHT)
       val gc = canvas.graphicsContext2D
       val group = new Group {
