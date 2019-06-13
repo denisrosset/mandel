@@ -5,6 +5,7 @@ import scalanative.annotation._
 import scalanative.unsigned._
 import SDL._
 import SDLExtra._
+import spire.implicits._
 
 @extern
 @link("SDL2")
@@ -87,6 +88,12 @@ object SDLExtra {
   val LEFT_KEY  = 1073741904
   val DOWN_KEY  = 1073741905
   val UP_KEY    = 1073741906
+  val DIGIT0_KEY = '0'.toInt
+  val DIGIT1_KEY = '1'.toInt
+  val DIGIT2_KEY = '2'.toInt
+  val DIGIT3_KEY = '3'.toInt
+  val DIGIT4_KEY = '4'.toInt
+  val DIGIT5_KEY = '5'.toInt
 
   val BUTTON_LEFT = 1.toUByte
   val BUTTON_MIDDLE = 2.toUByte
@@ -122,6 +129,7 @@ object NativeSDLBackend extends App {
   var viewpoint0: Viewpoint = viewpoint
   var x0 = 0
   var y0 = 0
+  var down = false
 
   object image extends ImageWriter {
     def width: Int = WIDTH
@@ -133,7 +141,12 @@ object NativeSDLBackend extends App {
   }
 
   def onDraw(): Unit = {
+    val t0 = System.nanoTime
     mandelbrot.plot(image, viewpoint)
+    val t1 = System.nanoTime
+    val fps = (10*1000*1000*1000.0/(t1.toDouble-t0.toDouble)).toInt / 10.0
+    println(s"$fps fps")
+    SDL_RenderPresent(renderer)
   }
 
   def init(): Unit = {
@@ -147,19 +160,45 @@ object NativeSDLBackend extends App {
 
   def loop(): Unit = {
     val event = stackalloc[Event]
-    onDraw()
     while (true) {
       while (SDL_PollEvent(event) != 0) {
         event.type_ match {
           case MOUSE_BUTTON_DOWN =>
             val e = event.asInstanceOf[Ptr[MouseButtonEvent]]
+            if (e.clicks.toInt == 2)
+              viewpoint = viewpoint.zoomOnPixel(e.x, e.y, WIDTH, HEIGHT)
             viewpoint0 = viewpoint
             x0 = e.x
             y0 = e.y
+            down = true
+          case MOUSE_MOTION =>
+            val e = event.asInstanceOf[Ptr[MouseMotionEvent]]
+            if (down)
+              viewpoint = viewpoint0.translate(x0 - e.x, y0 - e.y, WIDTH, HEIGHT)
           case MOUSE_BUTTON_UP =>
             val e = event.asInstanceOf[Ptr[MouseButtonEvent]]
-            if (e.button == BUTTON_LEFT) {
+            if (e.button == BUTTON_LEFT)
               viewpoint = viewpoint0.translate(x0 - e.x, y0 - e.y, WIDTH, HEIGHT)
+            down = false
+          case KEY_DOWN =>
+            val e = event.asInstanceOf[Ptr[KeyboardEvent]]
+            e.keycode match {
+              case DIGIT1_KEY =>
+                println("Switch to Float")
+                mandelbrot = new MandelbrotFloat(500)
+              case DIGIT2_KEY =>
+                println("Switch to Double")
+                mandelbrot = new MandelbrotDouble(500)
+              case DIGIT3_KEY =>
+                println("Switch to generic Float")
+                mandelbrot = new MandelbrotGeneric[Float](500)
+              case DIGIT4_KEY =>
+                println("Switch to generic Double")
+                mandelbrot = new MandelbrotGeneric[Double](500)
+              case DIGIT5_KEY =>
+                println("Switch to generic DoubleDouble")
+                mandelbrot = new MandelbrotGeneric[DoubleDouble](500)
+              case _ =>
             }
           case QUIT_EVENT =>
             return
@@ -168,7 +207,6 @@ object NativeSDLBackend extends App {
         }
       }
       onDraw()
-      delay((1000 / 12).toUInt)
     }
   }
 

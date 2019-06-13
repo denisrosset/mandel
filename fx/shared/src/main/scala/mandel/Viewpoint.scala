@@ -13,7 +13,6 @@ import spire.math.Rational
   * The top-left pixel is (0, 0) and the bottom-right pixel is (width-1, height-1).
   */
 case class Viewpoint(centerX: Rational, centerY: Rational, halfWidth: Rational) {
-  println(s"$centerX $centerY $halfWidth")
 
   def coord(x: Int, y: Int, w: Int, h: Int): (Rational, Rational) = {
     val halfHeight = (halfWidth * h)/w
