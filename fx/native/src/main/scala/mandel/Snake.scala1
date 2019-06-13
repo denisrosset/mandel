@@ -44,9 +44,6 @@ object SDL {
   type Keysym   = CStruct4[Scancode, Keycode, UShort, UInt]
   type Scancode = Int
   type Keycode  = Int
-
-  def SDL_GetMouseState(x: Ptr[Int], y: Ptr[Int]): UInt = extern
-
 }
 
 object SDLExtra {
@@ -55,7 +52,7 @@ object SDLExtra {
   val VSYNC        = 0x00000004.toUInt
 
   implicit class EventOps(val self: Ptr[Event]) extends AnyVal {
-    def type_ = self._1
+    def type_ = (self._1)
   }
 
   val QUIT_EVENT = 0x100.toUInt
@@ -79,7 +76,7 @@ object SDLExtra {
 
   implicit class KeyboardEventOps(val self: Ptr[KeyboardEvent])
       extends AnyVal {
-    def keycode: Keycode = self._8._2
+    def keycode: Keycode = (self._8._2)
   }
 }
 
@@ -189,8 +186,6 @@ object Snake extends App {
     SDL_Delay(ms)
 
   def loop(): Unit = {
-    val x = stackalloc[CInt]
-    val y = stackalloc[CInt]
     val event = stackalloc[Event]
     while (true) {
       while (SDL_PollEvent(event) != 0) {
@@ -207,7 +202,6 @@ object Snake extends App {
       }
       onDraw()
       onIdle()
-      println(SDL_GetMouseState(x, y))
       delay((1000 / 12).toUInt)
     }
   }
@@ -215,3 +209,4 @@ object Snake extends App {
   init()
   loop()
 }
+
